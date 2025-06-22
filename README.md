@@ -1,41 +1,61 @@
 # 📄 Smart ATS Management
 
-An AI-powered resume evaluation and applicant tracking system that combines a **Streamlit admin interface** and a **Flask backend API** to efficiently manage job descriptions, evaluate candidate resumes against roles using Google Gemini AI, and automate workflows with Zapier.
+An AI-powered resume evaluation and applicant tracking system that combines a **Streamlit-based admin interface** with a **Flask backend API**. It enables recruiters to efficiently manage job descriptions, evaluate candidate resumes using **Google Gemini AI**, and automate workflows with **Zapier** integration.
 
 ---
 
 ## 🚀 Features
 
-- 📝 **Job Description Management**  
-  Add, edit, and delete job descriptions to keep roles up to date.
+### 🧠 Streamlit Admin Interface
 
-- 📄 **Candidate Resume Submission**  
-  Candidates upload their resumes (PDF) along with name and email via the Flask backend.
+* 📝 **Job Description Management**
+  Easily add, edit, and delete job descriptions.
 
-- 🤖 **AI-Powered Resume Evaluation**  
-  Using Google Gemini 2.0 Flash, the app analyses resumes against job descriptions, returning:  
-  - Match percentage score  
-  - Matched keywords with reasons  
-  - Missing keywords with reasons  
-  - AI-generated profile summary  
+  Add JD
+  ![Add JD](https://github.com/user-attachments/assets/a52ad6fe-cb30-4a5e-9335-fb270accf75c)
 
-- ✅ **Detailed Keyword Insights**  
-  Clear display of matched and missing keywords side-by-side, aiding recruiters to quickly understand candidate fit.
+  Edit/Delete
+  ![Edit/Delete JD](https://github.com/user-attachments/assets/5aa35ba8-7dae-4509-8ba2-1296aa76b35d)
 
-- 📈 **Candidate Ranking and History**  
-  Track all evaluations, sort/filter by match score or date, and rank candidates for each job description.
+* 🤖 **AI-Powered Resume Evaluation**
+  Uses Gemini 2.0 Flash to evaluate resumes against selected job descriptions and generates:
 
-- 📥 **Downloadable Reports**  
-  Download summary reports and candidate resumes directly from the UI.
+  * ✅ Match percentage score
+  * ✅ Matched keywords with context
+  * ❌ Missing keywords with reasons
+  * 🧾 AI-generated profile summary
 
-- 🔗 **Zapier Integration for Automation**  
-  When a resume is evaluated, a summary is optionally sent automatically to a Zapier webhook. This enables:  
-  - Automated email notifications  
-  - Integration with applicant tracking systems (ATS) or CRMs  
-  - Further workflow automation (e.g., Slack alerts, Google Sheets updates)
+  ![Evaluation Result](https://github.com/user-attachments/assets/de67579b-9a5e-4057-9767-21d8b48d11dd)
 
-- 🌐 **Flask Backend API**  
-  Provides endpoints for resume submissions and serves web pages (`index.html`, `job.html`, `thankyou.html`), offering a user-friendly candidate-facing submission portal.
+* 📈 **Candidate Ranking and History**
+  Automatically store and rank candidates by JD match. View, sort, and filter past evaluations.
+
+  ![History](https://github.com/user-attachments/assets/13f2e127-f39f-4b4f-91e9-65c026277821)
+
+  Ranking the Candidates applied for JD
+  
+  ![Rank Candidates](https://github.com/user-attachments/assets/3aa00f89-854f-4406-a215-c852ed4b26b7)
+
+* 📥 **Downloadable Reports**
+  Export candidate summaries and keyword insights for offline use or sharing.
+
+---
+
+### 🌐 Flask Candidate Portal
+
+* 📄 **Resume Submission Form**
+  Simple front-end (`index.html`, `job.html`) lets candidates upload their name, email, JD, and PDF resume.
+  Open Positions
+  
+  <img width="1470" alt="Screenshot 2025-06-22 at 18 28 26" src="https://github.com/user-attachments/assets/64cbbf12-0ca6-4818-87c7-c1c1eb1e939b" />
+
+  Application Form
+  ![Candidate Submission](https://github.com/user-attachments/assets/ecf70581-4e75-457b-9b05-26c8928932d8)
+
+* 📨 **Thank You Page + Zapier Automation**
+  After submission, candidates are redirected to a thank-you page. Summary is optionally sent via Zapier to automate email replies, ATS entries, or Slack updates.
+
+  ![Thank You Page](https://github.com/user-attachments/assets/0fcdbd5f-aed1-41fb-8ff8-fa705639cd74)
 
 ---
 
@@ -43,18 +63,16 @@ An AI-powered resume evaluation and applicant tracking system that combines a **
 
 ### Streamlit Admin Panel (`admin.py`)
 
-- Manage job descriptions and view/add/edit/delete roles  
-- Upload candidate resumes, evaluate with AI, and save results  
-- View evaluation history with filters and search  
-- Rank candidates by match score for each job  
+* Manage job roles
+* Evaluate uploaded resumes using Gemini
+* View history and rank candidates
 
 ### Flask Backend (`app.py`)
 
-- Candidate-facing web app with submission form  
-- Receives name, email, JD text, and resume (PDF)  
-- Evaluates resume using Gemini AI, saves results to SQLite  
-- Sends evaluation summary to Zapier webhook (optional)  
-- Serves simple HTML pages to thank candidates after submission  
+* Candidate-facing submission form
+* AI evaluation triggered via API
+* Summary optionally sent to Zapier webhook
+* Serves HTML templates (`index.html`, `job.html`, `thankyou.html`)
 
 ---
 
@@ -62,54 +80,53 @@ An AI-powered resume evaluation and applicant tracking system that combines a **
 
 ### Requirements
 
-- Python 3.8+  
-- Google API Key (Gemini AI)  
-- Optional: Zapier account and webhook URL for automation  
+* Python 3.8+
+* Google API key (Gemini)
+* Zapier Webhook URL (optional)
 
 ### Setup Instructions
 
-1. **Clone the repository**
+1. **Clone the Repository**
 
 ```bash
 git clone https://github.com/rohithobillaneni/Smart_ATS_Management.git
 cd Smart_ATS_Management
-````
-
-2. **Create and activate a virtual environment**
-
-```bash
-python3 -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
 ```
 
-3. **Install dependencies**
+2. **Create and Activate Virtual Environment**
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. **Install Dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Configure environment variables**
-
-Create a `.env` file at the project root with:
+4. **Set Up Environment Variables**
+   Create a `.env` file:
 
 ```env
-GOOGLE_API_KEY=your_google_api_key_here
-ZAPIER_WEBHOOK_URL=your_zapier_webhook_url_here  # Optional, leave empty if not using Zapier
+GOOGLE_API_KEY=your_google_api_key
+ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/xxxxxxx  # Optional
 ```
 
-5. **Run Streamlit admin interface**
+5. **Run the Admin Panel**
 
 ```bash
 streamlit run admin.py
 ```
 
-6. **Run Flask backend for candidate submissions (optional)**
+6. **Run the Flask Backend (Optional for Candidate Submissions)**
 
 ```bash
 python app.py
 ```
 
-Visit `http://localhost:5000` to access the candidate submission portal.
+Visit `http://localhost:5000` to see the candidate form.
 
 ---
 
@@ -117,56 +134,53 @@ Visit `http://localhost:5000` to access the candidate submission portal.
 
 ```
 Smart_ATS_Management/
-│
-├── admin.py                 # Streamlit admin app (manage JDs, evaluate resumes)
-├── app.py                   # Flask backend API & candidate submission web app
-├── templates/               # Flask HTML templates (index.html, job.html, thankyou.html)
-├── ats_results.db           # SQLite database storing JDs and evaluation results
-├── requirements.txt         # Python dependencies
-├── .env                     # Environment variables (API keys, webhook URLs)
-├── README.md                # Project documentation (this file)
-└── other supporting files
+├── admin.py                 # Streamlit admin interface
+├── app.py                   # Flask backend for submissions
+├── templates/
+│   ├── index.html           # Candidate landing page
+│   ├── job.html             # Resume upload form
+│   └── thankyou.html        # Confirmation page
+├── ats_results.db           # SQLite database
+├── requirements.txt         # Dependencies
+├── .env                     # API keys & webhook URLs
+└── README.md                # Project documentation
 ```
 
 ---
 
-## 🤖 How Zapier Integration Works
+## 🔗 How Zapier Integration Works
 
-* When a candidate submits their resume, the backend evaluates it using Gemini AI.
-* The evaluation summary is sent as JSON payload to the Zapier webhook URL specified in `.env`.
-* Zapier can then trigger workflows such as:
+1. Candidate uploads resume via Flask frontend.
+2. Gemini AI evaluates and generates a summary.
+3. If a `ZAPIER_WEBHOOK_URL` is provided, the summary is sent as JSON to the webhook.
+4. Zapier handles:
 
-  * Sending a customised email notification to recruiters
-  * Logging candidate info and evaluation results in Google Sheets or Airtable
-  * Notifying a Slack channel or other communication tool
-* This automation reduces manual work and speeds up candidate processing.
+   * Email confirmation to candidate
+   * Logging to Google Sheets or Airtable
+   * Slack notification to recruiter
+   * Integration with ATS or CRM
 
 ---
 
 ## 🤝 Contributions
 
-Feel free to fork the repo, raise issues, or submit pull requests to improve this project!
-
----
-
-## 🛡️ Disclaimer
-
-This tool is a supportive aid designed to streamline resume evaluation using AI and automation. It should not replace comprehensive human review and decision-making.
+Open to suggestions, issues, and pull requests!
+If you find this project useful, consider starring ⭐ the repo or sharing it.
 
 ---
 
 ## 📧 Contact
 
-Created by **Rohith Obillaneni**
-📩 [rohithobillaneni92@gmail.com](mailto:rohithobillaneni92@gmail.com)
+**Rohith Obillaneni**
 📍 Luton, UK
+📩 [rohithobillaneni92@gmail.com](mailto:rohithobillaneni92@gmail.com)
 🔗 [LinkedIn](https://www.linkedin.com/in/rohithobillaneni)
 
 ---
 
 ## 📜 Licence
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT Licence.
+See the [LICENSE](LICENSE) file for full details.
 
 ---
-
