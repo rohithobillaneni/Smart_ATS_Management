@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ title }}</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f7f9fb;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+    }
+
+    h2 {
+      color: #1f4e79;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      white-space: pre-wrap;
+      color: #444;
+    }
+
+    label {
+      margin-top: 1rem;
+      font-weight: 600;
+      display: block;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 0.6rem;
+      margin-top: 0.3rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    input[type="file"] {
+      padding: 0.4rem;
+    }
+
+    button {
+      margin-top: 2rem;
+      background-color: #1f4e79;
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      width: 100%;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #174263;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>{{ title }}</h2>
+    <p>{{ description }}</p>
+
+    <form method="POST" action="/submit-form" enctype="multipart/form-data">
+      <input type="hidden" name="job_description_id" value="{{ id }}" />
+
+      <label for="name">Full Name</label>
+      <input type="text" name="name" required />
+
+      <label for="email">Email</label>
+      <input type="email" name="email" required />
+
+      <label for="resume">Upload Resume (PDF only)</label>
+      <input type="file" name="resume" accept="application/pdf" required />
+
+      <button type="submit">Submit Application</button>
+    </form>
+  </div>
+</body>
+</html>

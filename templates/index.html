@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart ATS – Open Positions</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(to right, #f0f4f7, #ffffff);
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      color: #1f4e79;
+      margin-bottom: 2rem;
+    }
+
+    .job-list {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .job-card {
+      background-color: #fff;
+      border-left: 6px solid #1f4e79;
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: transform 0.2s;
+    }
+
+    .job-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .job-card a {
+      text-decoration: none;
+      color: #1f4e79;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    .job-card p {
+      margin-top: 0.5rem;
+      color: #444;
+    }
+  </style>
+
+  <script>
+    async function loadJobs() {
+      const list = document.getElementById("job-list");
+      try {
+        const response = await fetch("/api/job_descriptions");
+        const jobs = await response.json();
+        if (jobs.length === 0) {
+          list.innerHTML = "<p>No job descriptions available right now.</p>";
+          return;
+        }
+
+        jobs.forEach(job => {
+          const card = document.createElement("div");
+          card.className = "job-card";
+          card.innerHTML = `
+            <a href="/job/${job.id}">${job.title}</a>
+            <p>${job.description.slice(0, 120)}...</p>
+          `;
+          list.appendChild(card);
+        });
+      } catch (err) {
+        list.innerHTML = "<p>Error loading jobs.</p>";
+        console.error(err);
+      }
+    }
+
+    window.onload = loadJobs;
+  </script>
+</head>
+<body>
+  <h1>💼 Open Positions</h1>
+  <div class="job-list" id="job-list"></div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+streamlit
+Flask
+flask-cors
+requests
+python-dotenv
+PyPDF2
+google-generativeai
+gunicorn

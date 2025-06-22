@@ -1,190 +1,188 @@
-import streamlit as st
-import google.generativeai as genai
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import os
-import PyPDF2 as pdf
-from dotenv import load_dotenv
-import re
 import json
-
-# Set page config early
-st.set_page_config(page_title="Smart ATS Evaluator", layout="wide", initial_sidebar_state="expanded")
+import sqlite3
+import requests
+from dotenv import load_dotenv
+import google.generativeai as genai
+from io import BytesIO
+import PyPDF2
+from werkzeug.utils import secure_filename
 
 # Load environment variables
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-else:
-    st.sidebar.error("Google API key not found. Please check your .env.")
-    st.stop()
+ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
-# Apply custom styles for consistent branding and layout
-st.markdown("""
-    <style>
-    .main-header {
-        font-size: 2.8rem;
-        color: #1f4e79;
-        margin-bottom: 0.5em;
-    }
-    .highlight {
-        background-color: #ffebcc;
-        padding: 0.3rem 0.4rem;
-        border-radius: 1px;
-        margin: 0.5px;
-        display: inline-block;
-        font-weight: 400;
-    }
-    </style>
-""", unsafe_allow_html=True)
+if not GOOGLE_API_KEY:
+    raise Exception("GOOGLE_API_KEY is not set")
 
-# Extract text from uploaded PDF resume
-def input_pdf_text(uploaded_file):
-    try:
-        reader = pdf.PdfReader(uploaded_file)
-        return "".join(page.extract_text() or "" for page in reader.pages)
-    except Exception as e:
-        st.error(f"Error reading PDF: {e}")
-        return ""
+genai.configure(api_key=GOOGLE_API_KEY)
 
-# Interact with Gemini API and generate ATS evaluation in JSON format
-def get_ats_evaluation(resume_text, job_desc):
+# Setup Flask
+app = Flask(__name__)
+CORS(app)
+
+# DB Path
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, "ats_results.db")
+
+# Create tables if they don't exist
+def create_tables():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Job Descriptions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS job_descriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT UNIQUE NOT NULL,
+            description TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Results table with PDF stored as blob
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            job_description_id INTEGER NOT NULL,
+            resume_name TEXT,
+            resume_file BLOB,
+            match_percent TEXT,
+            summary TEXT,
+            matched_keywords TEXT,
+            missing_keywords TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(job_description_id) REFERENCES job_descriptions(id)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+create_tables()
+
+# Gemini Evaluation Logic
+def evaluate_resume_with_gemini(resume_text, jd_text):
     prompt = f"""
 You are an intelligent ATS system evaluating candidates for tech roles.
 Compare the resume with the job description and return structured JSON with:
-
 - "JD Match": "XX%"
-- "MatchedKeywords": [{{"keyword": "Python", "reason": "Mentioned in experience section as a key skill"}}, ...]
-- "MissingKeywords": [{{"keyword": "Docker", "reason": "Not mentioned anywhere in the resume"}}, ...]
-- "Profile Summary": "Brief summary of strengths, tech stack, alignment with job."
-
+- "MatchedKeywords": [{{"keyword": "Python", "reason": "..."}}, ...]
+- "MissingKeywords": [{{"keyword": "Docker", "reason": "..."}}, ...]
+- "Profile Summary": "..."
 Resume:
 {resume_text}
 
 Job Description:
-{job_desc}
+{jd_text}
 """
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    response = model.generate_content(prompt)
+    clean_output = response.text.strip().replace("**", "").replace("```json", "").replace("```", "")
+    return json.loads(clean_output)
+
+# Home Route
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
+
+# Fetch all JDs (API)
+@app.route("/api/job_descriptions", methods=["GET"])
+def get_job_descriptions():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, description FROM job_descriptions ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    jds = [{"id": row[0], "title": row[1], "description": row[2]} for row in rows]
+    return jsonify(jds)
+
+@app.route("/job/<int:jd_id>", methods=["GET"])
+def job_page(jd_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, description FROM job_descriptions WHERE id = ?", (jd_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return "<h2>Job not found</h2>", 404
+
+    return render_template("job.html", id=row[0], title=row[1], description=row[2])
+
+
+# Submit Form Endpoint
+@app.route("/submit-form", methods=["POST"])
+def submit_form():
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        return f"Error from Gemini API: {e}"
+        name = request.form["name"]
+        email = request.form["email"]
+        job_description_id = int(request.form["job_description_id"])
+        file = request.files["resume"]
 
+        if not file or not file.filename.endswith(".pdf"):
+            return jsonify({"error": "Invalid file type (PDF required)"}), 400
 
-# Sidebar inputs for JD and Resume
-st.sidebar.header("🔍 ATS Evaluation")
-jd = st.sidebar.text_area("Paste Job Description", height=200)
-uploaded_file = st.sidebar.file_uploader("Upload Resume (PDF)", type="pdf")
-run = st.sidebar.button("Evaluate")
+        resume_binary = file.read()
+        filename = secure_filename(file.filename)
 
-# Main title of the app
-st.markdown("<h1 class='main-header'>📄 Smart ATS Evaluator</h1>", unsafe_allow_html=True)
-st.write("Use AI to analyse and optimise your resume for a job description.")
+        # Fetch job description text
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT description FROM job_descriptions WHERE id=?", (job_description_id,))
+        jd_row = cursor.fetchone()
 
-# Run evaluation only when inputs are valid and user clicks "Evaluate"
-if run:
-    if not uploaded_file or not jd.strip():
-        st.warning("Please provide both a job description and resume.")
-    else:
-        with st.spinner("Analysing resume..."):
-            resume_text = input_pdf_text(uploaded_file)
-            raw_output = get_ats_evaluation(resume_text, jd)
+        if not jd_row:
+            return jsonify({"error": "Invalid job description ID"}), 400
 
-            # Clean Gemini's output for valid JSON parsing
-            raw_output_clean = raw_output.replace("**", "").replace("```json", "").replace("```", "")
+        jd_text = jd_row[0]
 
-            # Attempt to parse cleaned output as JSON
+        # Extract resume text
+        reader = PyPDF2.PdfReader(BytesIO(resume_binary))
+        resume_text = " ".join(page.extract_text() or "" for page in reader.pages)
+
+        # Get evaluation
+        ats_result = evaluate_resume_with_gemini(resume_text, jd_text)
+
+        # Save result to DB
+        cursor.execute('''
+            INSERT INTO results
+            (name, email, job_description_id, resume_name, resume_file, match_percent, summary, matched_keywords, missing_keywords)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            name, email, job_description_id, filename, resume_binary,
+            ats_result.get("JD Match", "0%"),
+            ats_result.get("Profile Summary", "N/A"),
+            json.dumps(ats_result.get("MatchedKeywords", [])),
+            json.dumps(ats_result.get("MissingKeywords", []))
+        ))
+
+        conn.commit()
+        conn.close()
+
+        # Notify Zapier (optional)
+        if ZAPIER_WEBHOOK_URL:
+            zapier_payload = {
+                "name": name,
+                "email": email,
+                "job_description_id": job_description_id
+            }
             try:
-                raw_json = json.loads(raw_output_clean)
-            except json.JSONDecodeError:
-                st.error("⚠️ Failed to parse output. Showing raw response instead.")
-                raw_json = {"response": raw_output_clean}
+                zapier_response = requests.post(ZAPIER_WEBHOOK_URL, json=zapier_payload)
+                if zapier_response.status_code != 200:
+                    app.logger.warning(f"Zapier webhook failed: {zapier_response.status_code} - {zapier_response.text}")
+            except Exception as zapier_error:
+                app.logger.warning(f"Zapier webhook exception: {zapier_error}")
 
-        # ----- Tabs for UI presentation -----
-        tab1, tab2 = st.tabs(["📊 Result", "📄 Detailed View"])
+        return render_template("thankyou.html")
 
-        # ----- Tab 1: Result Summary -----
-        with tab1:
-            st.subheader("📈 Match Score")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-            # Extract and display JD Match score
-            score_str = raw_json.get("JD Match", "0%")
-            score = int(score_str.replace("%", "")) if "%" in score_str else 0
-            st.metric("JD Match", f"{score}%")
-            st.progress(score)
-
-            # Create two columns for side-by-side view
-            col1, col2 = st.columns(2)
-
-            # ---- Matched Keywords (left) ----
-            with col1:
-                st.subheader("✅ Matched Keywords")
-                matched = raw_json.get("MatchedKeywords", [])
-                if isinstance(matched, list) and matched:
-                    for item in matched:
-                        keyword = item.get("keyword", "")
-                        reason = item.get("reason", "")
-                        st.markdown(
-                            f"<span class='highlight'>{keyword}</span>",
-                            unsafe_allow_html=True
-                        )
-                else:
-                    st.write("No specific keywords matched.")
-
-            # ---- Missing Keywords (right) ----
-            with col2:
-                st.subheader("❌ Missing Keywords")
-                missing = raw_json.get("MissingKeywords", [])
-                if isinstance(missing, list) and missing:
-                    for item in missing:
-                        keyword = item.get("keyword", "")
-                        reason = item.get("reason", "")
-                        st.markdown(
-                            f"<span class='highlight'>{keyword}</span>",
-                            unsafe_allow_html=True
-                        )
-                else:
-                    st.write("No major keywords missing. ✅")
-
-            # ---- Profile Summary and Download ----
-            st.subheader("🧾 Profile Summary")
-            summary = raw_json.get("Profile Summary", "No summary generated.")
-            st.write(summary)
-
-            # Allow download of the profile summary as text
-            st.download_button(
-                label="⬇️ Download Summary",
-                data=summary,
-                file_name="profile_summary.txt"
-            )
-
-        # ----- Tab 2: Raw JSON output (detailed) -----
-        with tab2:
-            st.subheader("📄 More Detailed Output")
-            score_str = raw_json.get("JD Match", "0%")
-            score = int(score_str.replace("%", "")) if "%" in score_str else 0
-            st.metric("JD Match", f"{score}%")
-            st.progress(score)
-
-            st.subheader("❌ Missing Keywords")
-            if isinstance(raw_json.get("MissingKeywords"), list):
-                for item in raw_json["MissingKeywords"]:
-                    st.markdown(
-                        f"<span class='highlight'>{item['keyword']}</span>: {item['reason']}",
-                        unsafe_allow_html=True
-                    )
-            else:
-                st.write("No major keywords missing. ✅")
-
-            st.subheader("✅ Matched Keywords")
-            if isinstance(raw_json.get("MatchedKeywords"), list):
-                for item in raw_json["MatchedKeywords"]:
-                    st.markdown(
-                        f"<span class='highlight'>{item['keyword']}</span>: {item['reason']}",
-                        unsafe_allow_html=True
-                    )
-            else:
-                st.write("No specific keywords matched.")
-
-
-
+# Start the Flask server
+if __name__ == "__main__":
+    app.run(debug=True)
