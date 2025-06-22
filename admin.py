@@ -65,7 +65,7 @@ else:
     st.sidebar.error("Google API key not found. Please check your .env.")
     st.stop()
 
-# Custom CSS (as you had it)
+# Custom CSS
 st.markdown("""
     <style>
     .main-header {
@@ -420,7 +420,7 @@ elif view_option == "🧠 Evaluate":
                         st.subheader("🧾 Profile Summary")
                         st.write(summary)
 
-# History View with expandable cards and large, clear headers
+# History View with expandable cards
 elif view_option == "📜 History":
     st.markdown("<h2 class='main-header'>📜 Previous Evaluations</h2>", unsafe_allow_html=True)
     session = Session()
